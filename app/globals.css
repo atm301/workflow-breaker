@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-primary: #6366F1;
+  --color-brand-secondary: #8B5CF6;
+  --color-brand-accent: #A78BFA;
+  --color-surface: #FAFAFA;
+  --color-surface-dark: #1E1E2E;
+  --color-text-main: #1F2937;
+  --color-text-muted: #6B7280;
+  --color-border-light: #E5E7EB;
+}
+
+:root {
+  --brand-primary: #6366F1;
+  --brand-secondary: #8B5CF6;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text-main);
+}
+
+.dark body {
+  background: var(--color-surface-dark);
+  color: #E5E7EB;
+}
+
+/* Gradient button */
+.btn-gradient {
+  background: linear-gradient(135deg, var(--color-brand-primary), var(--color-brand-secondary));
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-gradient:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+}
+.btn-gradient:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Phase connector line */
+.phase-connector {
+  position: relative;
+}
+.phase-connector::before {
+  content: '';
+  position: absolute;
+  left: 1.25rem;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to bottom, var(--color-brand-primary), var(--color-brand-secondary));
+  opacity: 0.3;
+}
+
+/* Skeleton loading */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 0.5rem;
+}
+.dark .skeleton {
+  background: linear-gradient(90deg, #2a2a3e 25%, #3a3a4e 50%, #2a2a3e 75%);
+  background-size: 200% 100%;
+}
+
+/* Step fade-in */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+/* Flow chart node */
+.flow-node {
+  transition: all 0.2s;
+}
+.flow-node:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.2);
+}
