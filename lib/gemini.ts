@@ -6,17 +6,26 @@ export async function callGemini(prompt: string): Promise<string> {
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90_000);
+
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.5, maxOutputTokens: 8192 },
+            generationConfig: {
+              temperature: 0.5,
+              maxOutputTokens: 8192,
+              thinkingConfig: { thinkingBudget: 2048 },
+            },
           }),
         }
       );
+      clearTimeout(timeout);
 
       if (!res.ok) {
         const errText = await res.text().catch(() => "");
@@ -35,7 +44,10 @@ export async function callGemini(prompt: string): Promise<string> {
         throw new Error(msg || "Gemini API error");
       }
 
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      // Gemini 2.5 Flash may return thinking + text parts; get the last text part
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const textPart = [...parts].reverse().find((p: { text?: string }) => p.text && !p.text.startsWith("<"));
+      const text = (textPart?.text || parts[parts.length - 1]?.text || "").trim();
       if (!text) throw new Error("AI returned empty response");
 
       const jsonMatch = text.match(/\{[\s\S]*\}/);
