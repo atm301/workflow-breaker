@@ -17,6 +17,14 @@ function checkRate(ip: string): boolean {
   return true;
 }
 
+// Result cache: hash → { data, ts }  TTL = 30 min
+const cache = new Map<string, { data: unknown; ts: number }>();
+const CACHE_TTL = 30 * 60 * 1000;
+
+function cacheKey(goal: string, strategy: string, lang: string): string {
+  return `${goal.toLowerCase().trim()}::${strategy}::${lang}`;
+}
+
 function getMethodInstruction(strategy: Strategy, lang: Lang): string {
   const instructions: Record<Strategy, string> = {
     auto: lang === "zh"
@@ -39,10 +47,7 @@ function getMethodInstruction(strategy: Strategy, lang: Lang): string {
 }
 
 function buildPrompt(goal: string, context: string, lang: Lang, strategy: Strategy): string {
-  const langInstruction = lang === "zh"
-    ? "請用繁體中文回覆。"
-    : "Please respond in English.";
-
+  const langInstruction = lang === "zh" ? "請用繁體中文回覆。" : "Please respond in English.";
   const methodInstruction = getMethodInstruction(strategy, lang);
 
   return `You are a professional Workflow Architect and project planner.
@@ -93,53 +98,52 @@ Rules:
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-      || req.headers.get("x-real-ip")
-      || "unknown";
+      || req.headers.get("x-real-ip") || "unknown";
 
     if (!checkRate(ip)) {
-      return NextResponse.json(
-        { error: "rate_limit", message: "Too many requests. Please try again later." },
-        { status: 429 }
-      );
+      return NextResponse.json({ error: "rate_limit", message: "Too many requests." }, { status: 429 });
     }
 
     const body = await req.json();
     const { goal, context = "", lang = "zh", strategy = "auto" } = body as {
-      goal: string;
-      context?: string;
-      lang?: Lang;
-      strategy?: Strategy;
+      goal: string; context?: string; lang?: Lang; strategy?: Strategy;
     };
 
     if (!goal || goal.trim().length < 2) {
-      return NextResponse.json(
-        { error: "invalid_input", message: "Goal is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "invalid_input", message: "Goal is required" }, { status: 400 });
     }
 
     const validStrategies: Strategy[] = ["auto", "wbs", "userStory", "sipoc", "fiveW"];
     const safeStrategy = validStrategies.includes(strategy as Strategy) ? strategy as Strategy : "auto";
 
+    // Check cache (only for same goal+strategy+lang, ignoring context for broader hits)
+    const key = cacheKey(goal.trim(), safeStrategy, lang as string);
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.ts < CACHE_TTL && !context.trim()) {
+      return NextResponse.json({ success: true, data: cached.data, cached: true });
+    }
+
     const prompt = buildPrompt(goal.trim(), context.trim(), lang as Lang, safeStrategy);
     const raw = await callGemini(prompt);
     const result = JSON.parse(raw);
 
+    // Store in cache
+    if (!context.trim()) {
+      cache.set(key, { data: result, ts: Date.now() });
+      // Clean old entries
+      if (cache.size > 100) {
+        const now = Date.now();
+        for (const [k, v] of cache) { if (now - v.ts > CACHE_TTL) cache.delete(k); }
+      }
+    }
+
     return NextResponse.json({ success: true, data: result });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-
     if (msg === "QUOTA_EXHAUSTED") {
-      return NextResponse.json(
-        { error: "quota_exhausted", message: "API quota exhausted" },
-        { status: 503 }
-      );
+      return NextResponse.json({ error: "quota_exhausted", message: "API quota exhausted" }, { status: 503 });
     }
-
     console.error("[generate] Error:", msg);
-    return NextResponse.json(
-      { error: "server_error", message: msg },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "server_error", message: msg }, { status: 500 });
   }
 }
