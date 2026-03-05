@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Script from "next/script";
+import { CookieConsent } from "./CookieConsent";
 
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID || "G-RDJD1YVHR7";
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "4979950938896019";
@@ -15,13 +16,13 @@ export const metadata: Metadata = {
     url: "https://workflow.atmarketing.tw",
     siteName: "WorkFlow Breaker",
     type: "website",
-    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "WorkFlow Breaker" }],
+    images: [{ url: "/api/og", width: 1200, height: 630, alt: "WorkFlow Breaker" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "WorkFlow Breaker — AI 工作流拆解器",
     description: "輸入你的目標，AI 幫你拆解成可執行的工作流程步驟",
-    images: ["/og-image.png"],
+    images: ["/api/og"],
   },
   icons: { icon: "/favicon.svg", apple: "/favicon.svg" },
   metadataBase: new URL("https://workflow.atmarketing.tw"),
@@ -68,6 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen bg-surface dark:bg-surface-dark antialiased">
         {children}
+        <CookieConsent />
       </body>
     </html>
   );
