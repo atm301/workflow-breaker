@@ -6,14 +6,12 @@ import type { WorkflowResult, WorkflowStep } from "@/lib/types";
 import {
   Zap, Globe, Target, FileText, Sparkles, Layers, Users, Factory, HelpCircle,
   Settings, Loader2, CheckCircle2, ChevronRight, ChevronDown, Copy, Check, Trash2,
-  AlertCircle, BookOpen, LayoutDashboard, Lightbulb, MousePointerClick,
+  AlertCircle, BookOpen, Lightbulb,
   BrainCircuit, Sun, Moon, Share2, List, GitBranch, RefreshCw, ExternalLink,
   TrendingUp, GraduationCap, Trophy, Flame,
 } from "lucide-react";
 
 type ViewMode = "list" | "flow";
-type ActiveView = "generator" | "tutorial";
-
 interface SubStep { title: string; description: string; estimatedTime: string; tools: string; }
 
 const STRATEGIES: { id: Strategy; icon: typeof Sparkles; color: string; activeColor: string; tagKey: string }[] = [
@@ -69,7 +67,6 @@ function useUsageCounter() {
 }
 
 export default function Home() {
-  const [activeView, setActiveView] = useState<ActiveView>("generator");
   const [lang, setLang] = useState<Lang>("zh");
   const [dark, setDark] = useState(false);
   const [goal, setGoal] = useState("");
@@ -474,14 +471,9 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto">
-            <div className="flex bg-gray-100 dark:bg-gray-800 p-1 rounded-xl flex-1 md:flex-none">
-              <button onClick={() => setActiveView("generator")} className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${activeView === "generator" ? "bg-white dark:bg-gray-700 text-brand-primary shadow-sm" : "text-text-muted hover:text-text-main"}`}>
-                <LayoutDashboard className="w-4 h-4" />{d.navGenerator}
-              </button>
-              <button onClick={() => setActiveView("tutorial")} className={`flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-1.5 ${activeView === "tutorial" ? "bg-white dark:bg-gray-700 text-brand-primary shadow-sm" : "text-text-muted hover:text-text-main"}`}>
-                <BookOpen className="w-4 h-4" />{d.navTutorial}
-              </button>
-            </div>
+            <a href="/methods" className="px-4 py-2 rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold text-text-muted flex items-center gap-1.5 transition-colors">
+              <BookOpen className="w-4 h-4 text-brand-primary" />{d.navTutorial}
+            </a>
             <button onClick={() => { setLang(lang === "zh" ? "en" : "zh"); setResult(null); }} className="px-3 py-2 rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold text-text-muted flex items-center gap-1.5 transition-colors">
               <Globe className="w-4 h-4 text-brand-primary" />{lang === "zh" ? "EN" : "中文"}
             </button>
@@ -495,9 +487,8 @@ export default function Home() {
       <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 md:py-8">
 
         {/* === GENERATOR === */}
-        {activeView === "generator" && (
-          <>
-            <section className="text-center mb-6">
+        <>
+          <section className="text-center mb-6">
               <h2 className="text-2xl md:text-3xl font-black mb-2 bg-gradient-to-r from-brand-primary to-brand-secondary bg-clip-text text-transparent">{d.heroTitle}</h2>
               <p className="text-text-muted">{d.heroDesc}</p>
             </section>
@@ -845,41 +836,9 @@ export default function Home() {
                 </div>
               </section>
             )}
-          </>
-        )}
+        </>
 
-        {/* === TUTORIAL === */}
-        {activeView === "tutorial" && (
-          <div className="max-w-4xl mx-auto space-y-12 pb-16 animate-fade-in-up">
-            <div className="text-center pt-4">
-              <h2 className="text-3xl font-black text-text-main dark:text-gray-100 mb-2">{d.tutorialTitle}</h2>
-              <p className="text-text-muted text-lg">{d.tutorialSub}</p>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {STRATEGIES.filter(s => s.id !== "auto").map(s => {
-                const Icon = s.icon;
-                return (
-                  <div key={s.id} className="bg-white dark:bg-gray-800 rounded-2xl p-6 md:p-8 border border-border-light dark:border-gray-700 hover:shadow-xl transition-all group">
-                    <div className={`w-14 h-14 ${s.color} text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform`}><Icon className="w-6 h-6" /></div>
-                    <h3 className="text-xl font-black text-text-main dark:text-gray-100 mb-3">{dk(stratTitleKey[s.id])}</h3>
-                    <p className="text-text-muted text-sm leading-relaxed mb-6">{dk(stratDescKey[s.id])}</p>
-                    <button onClick={() => { setStrategy(s.id); setActiveView("generator"); }} className="text-sm font-bold text-brand-primary hover:underline flex items-center gap-1">
-                      {lang === "zh" ? "使用此策略" : "Use this strategy"}<ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="bg-gradient-to-br from-brand-primary to-brand-secondary rounded-2xl p-8 md:p-10 text-white flex flex-col md:flex-row items-center gap-8 shadow-xl">
-              <div className="bg-white/20 p-6 rounded-full shrink-0 backdrop-blur-sm"><Lightbulb className="w-10 h-10" /></div>
-              <div className="text-center md:text-left">
-                <h3 className="text-2xl font-black mb-3">{d.howToAiTitle}</h3>
-                <p className="text-white/80 leading-relaxed mb-4">{d.howToAiContent}</p>
-                <button onClick={() => setActiveView("generator")} className="inline-flex items-center gap-2 bg-white text-brand-primary px-6 py-3 rounded-xl font-black hover:bg-gray-50 transition-all"><MousePointerClick className="w-4 h-4" />{d.backToTool}</button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Tutorial moved to /methods page */}
       </main>
 
       {/* Footer */}
@@ -894,7 +853,10 @@ export default function Home() {
               </span>
             )}
           </div>
-          <a href="/privacy" className="hover:text-brand-primary transition-colors">{d.privacy}</a>
+          <div className="flex items-center gap-4">
+            <a href="/methods" className="hover:text-brand-primary transition-colors">{d.navTutorial}</a>
+            <a href="/privacy" className="hover:text-brand-primary transition-colors">{d.privacy}</a>
+          </div>
         </div>
       </footer>
 
