@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { streamGemini } from "@/lib/gemini";
+import { streamGemini, FALLBACK_MODEL } from "@/lib/gemini";
 import type { Lang, Strategy } from "@/lib/i18n";
 
 // Shared rate limit
@@ -118,16 +118,34 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
+        const send = (data: string) => controller.enqueue(encoder.encode(`data: ${data}\n\n`));
         try {
-          for await (const chunk of streamGemini(prompt)) {
-            // Send as SSE format
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+          // Try primary model first
+          let hasContent = false;
+          try {
+            for await (const chunk of streamGemini(prompt)) {
+              hasContent = true;
+              send(JSON.stringify({ text: chunk }));
+            }
+          } catch (primaryErr) {
+            const msg = primaryErr instanceof Error ? primaryErr.message : "";
+            if (msg === "QUOTA_EXHAUSTED") { send(JSON.stringify({ error: msg })); controller.close(); return; }
+            // Fallback to secondary model
+            if (!hasContent) {
+              console.warn(`[stream] Primary model failed, falling back to ${FALLBACK_MODEL}`);
+              send(JSON.stringify({ text: "\n" })); // keep-alive
+              for await (const chunk of streamGemini(prompt, FALLBACK_MODEL)) {
+                send(JSON.stringify({ text: chunk }));
+              }
+            } else {
+              throw primaryErr; // partial content, can't recover
+            }
           }
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          send("[DONE]");
           controller.close();
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Unknown error";
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: msg })}\n\n`));
+          send(JSON.stringify({ error: msg }));
           controller.close();
         }
       },

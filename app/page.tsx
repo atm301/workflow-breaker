@@ -111,82 +111,145 @@ export default function Home() {
     } catch { /* ignore */ }
   }, []);
 
+  // Expected ~4000 chars for a typical workflow JSON response
+  const EXPECTED_STREAM_CHARS = 4000;
+  const streamProgressRef = useRef(0);
+
+  // Stream SSE with auto-reconnect (up to 1 retry)
+  const readStream = async (bodyPayload: string, setErr: (e: string) => void): Promise<string | null> => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch("/api/generate-stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: bodyPayload,
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.error === "quota_exhausted") { setErr(d.apiExhausted); return null; }
+          if (data.error === "rate_limit") { setErr(lang === "zh" ? "請求太頻繁，請稍後再試" : "Too many requests."); return null; }
+          if (attempt === 0) continue;
+          setErr(data.message || d.apiError);
+          return null;
+        }
+        const reader = res.body?.getReader();
+        if (!reader) { if (attempt === 0) continue; return null; }
+        const decoder = new TextDecoder();
+        let accumulated = "";
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith("data: [DONE]")) continue;
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const parsed = JSON.parse(line.slice(6));
+              if (parsed.error) {
+                if (parsed.error === "QUOTA_EXHAUSTED") { setErr(d.apiExhausted); return null; }
+                throw new Error(parsed.error);
+              }
+              if (parsed.text) {
+                accumulated += parsed.text;
+                streamProgressRef.current = Math.min(accumulated.length / EXPECTED_STREAM_CHARS, 0.95);
+                setStreamText(accumulated);
+              }
+            } catch (e) {
+              if (e instanceof Error && e.message !== "QUOTA_EXHAUSTED") continue;
+              throw e;
+            }
+          }
+        }
+        if (accumulated.length > 10) return accumulated;
+        if (attempt === 0) continue;
+        return accumulated;
+      } catch {
+        if (attempt === 1) return null;
+      }
+    }
+    return null;
+  };
+
+  // Fallback: non-streaming generate
+  const fallbackGenerate = async (bodyPayload: string, setErr: (e: string) => void): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: bodyPayload,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.error === "quota_exhausted") setErr(d.apiExhausted);
+        else if (data.error === "rate_limit") setErr(lang === "zh" ? "請求太頻繁，請稍後再試" : "Too many requests.");
+        else setErr(data.message || d.apiError);
+        return null;
+      }
+      return JSON.stringify(data.data);
+    } catch { return null; }
+  };
+
+  // Validate workflow JSON structure
+  const validateWorkflow = (obj: Record<string, unknown>): boolean => {
+    if (!obj.phases || !Array.isArray(obj.phases) || obj.phases.length === 0) return false;
+    for (const phase of obj.phases as Record<string, unknown>[]) {
+      if (!phase.name || !Array.isArray(phase.steps)) return false;
+    }
+    return true;
+  };
+
   const handleGenerate = useCallback(async (overrideStrategy?: Strategy) => {
     if (!goal.trim() || loading) return;
     setLoading(true);
     setError("");
     setResult(null);
     setStreamText("");
+    streamProgressRef.current = 0;
     setCheckedSteps(new Set());
     setDrilldowns({});
     setCompareResult(null);
     setCompareStrategy(null);
     localStorage.removeItem("wf_checked");
 
-    try {
-      const res = await fetch("/api/generate-stream", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goal: goal.trim(), context: context.trim(), lang, strategy: overrideStrategy || strategy }),
-      });
+    let genError = "";
+    const setErr = (e: string) => { genError = e; };
+    const bodyPayload = JSON.stringify({ goal: goal.trim(), context: context.trim(), lang, strategy: overrideStrategy || strategy });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        if (data.error === "quota_exhausted") setError(d.apiExhausted);
-        else if (data.error === "rate_limit") setError(lang === "zh" ? "請求太頻繁，請稍後再試" : "Too many requests.");
-        else setError(data.message || d.apiError);
+    try {
+      // Try streaming first, fallback to non-streaming
+      let raw = await readStream(bodyPayload, setErr);
+      if (!raw && !genError) {
+        setStreamText(lang === "zh" ? "切換到標準模式..." : "Switching to standard mode...");
+        raw = await fallbackGenerate(bodyPayload, setErr);
+      }
+      if (!raw) { setError(genError || d.apiError); return; }
+
+      // Parse + validate JSON structure
+      const jsonMatch = raw.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) { setError(d.apiError); return; }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (!validateWorkflow(parsed)) {
+        setError(lang === "zh" ? "AI 回應結構異常，請重試" : "AI response structure error, please retry");
         return;
       }
 
-      // Stream reading
-      const reader = res.body?.getReader();
-      if (!reader) { setError(d.apiError); return; }
-      const decoder = new TextDecoder();
-      let accumulated = "";
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-        for (const line of lines) {
-          if (line.startsWith("data: [DONE]")) continue;
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const parsed = JSON.parse(line.slice(6));
-            if (parsed.error) {
-              if (parsed.error === "QUOTA_EXHAUSTED") setError(d.apiExhausted);
-              else setError(parsed.error);
-              return;
-            }
-            if (parsed.text) {
-              accumulated += parsed.text;
-              setStreamText(accumulated);
-            }
-          } catch { /* skip */ }
-        }
-      }
-
-      // Parse the accumulated JSON
-      const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        setResult(parsed);
-        setStreamText("");
-        incrementUsage();
-        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-      } else {
-        setError(d.apiError);
-      }
+      streamProgressRef.current = 1;
+      setResult(parsed);
+      setStreamText("");
+      incrementUsage();
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const w = window as any;
         if (w.gtag) w.gtag("event", "generate_workflow", { event_category: "engagement", event_label: goal.trim().slice(0, 50), strategy: overrideStrategy || strategy });
       } catch { /* ignore */ }
-    } catch { setError(d.apiError); } finally { setLoading(false); }
+    } catch { setError(genError || d.apiError); } finally { setLoading(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [goal, context, lang, strategy, loading, d, incrementUsage]);
 
   // Compare: generate with a different strategy
@@ -541,13 +604,27 @@ export default function Home() {
                     <div key={i} className={`w-2 h-2 rounded-full transition-colors duration-300 ${i <= LOADING_TEXTS_ZH.indexOf(lang === "zh" ? loadingText : LOADING_TEXTS_EN[LOADING_TEXTS_ZH.indexOf(loadingText)] || loadingText) ? "bg-brand-primary" : "bg-gray-200 dark:bg-gray-600"}`} />
                   ))}
                 </div>
-                {/* Streaming text preview */}
+                {/* Streaming progress + text preview */}
                 {streamText && (
-                  <div className="w-full max-w-lg mt-4">
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 max-h-48 overflow-y-auto">
-                      <pre className="text-xs text-text-muted font-mono whitespace-pre-wrap break-all leading-relaxed">{streamText.slice(-500)}</pre>
+                  <div className="w-full max-w-lg mt-4 space-y-3">
+                    {/* Progress bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] font-bold text-text-muted">
+                        <span>{lang === "zh" ? "生成進度" : "Progress"}</span>
+                        <span className="text-brand-primary">{Math.round(streamProgressRef.current * 100)}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-brand-primary to-brand-secondary rounded-full transition-all duration-500 ease-out"
+                          style={{ width: `${Math.round(streamProgressRef.current * 100)}%` }}
+                        />
+                      </div>
                     </div>
-                    <p className="text-[10px] text-text-muted text-center mt-2 font-bold">
+                    {/* Text preview */}
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 max-h-40 overflow-y-auto">
+                      <pre className="text-xs text-text-muted font-mono whitespace-pre-wrap break-all leading-relaxed">{streamText.slice(-400)}</pre>
+                    </div>
+                    <p className="text-[10px] text-text-muted text-center font-bold">
                       {lang === "zh" ? "AI 正在即時生成中..." : "AI is generating in real-time..."}
                     </p>
                   </div>
