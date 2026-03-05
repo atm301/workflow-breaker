@@ -15,6 +15,7 @@ export interface WorkflowPhase {
 
 export interface WorkflowResult {
   goal: string;
+  method?: string;
   phases: WorkflowPhase[];
   totalEstimatedTime: string;
   criticalPath: string[];

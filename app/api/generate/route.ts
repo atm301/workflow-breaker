@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { callGemini } from "@/lib/gemini";
-import type { Lang } from "@/lib/i18n";
+import type { Lang, Strategy } from "@/lib/i18n";
 
 // Simple in-memory rate limit: 10 req / hour / IP
 const rateMap = new Map<string, { count: number; reset: number }>();
@@ -17,14 +17,39 @@ function checkRate(ip: string): boolean {
   return true;
 }
 
-function buildPrompt(goal: string, context: string, lang: Lang): string {
+function getMethodInstruction(strategy: Strategy, lang: Lang): string {
+  const instructions: Record<Strategy, string> = {
+    auto: lang === "zh"
+      ? "分析目標後，自動從 WBS、User Story、SIPOC、5W1H 中選擇最適合的方法來拆解。在回應中說明你選擇了哪個方法。"
+      : "Analyze the goal and automatically select the MOST APPROPRIATE method among WBS, User Story, SIPOC, 5W1H. Mention which method you chose.",
+    wbs: lang === "zh"
+      ? "使用 WBS（Work Breakdown Structure）工作分解結構來拆解。聚焦於「階段 > 里程碑 > 可交付成果」的層級拆解。"
+      : "Use WBS (Work Breakdown Structure). Focus on Phase > Milestone > Deliverable hierarchy.",
+    userStory: lang === "zh"
+      ? "使用 User Story Map（使用者故事地圖）來拆解。從使用者旅程出發，聚焦功能如何為用戶創造價值。"
+      : "Use User Story Map. Focus on user journey and how features create value for users.",
+    sipoc: lang === "zh"
+      ? "使用 SIPOC 流程模型來拆解。釐清每個階段的供應商、輸入、流程、輸出和客戶。"
+      : "Use SIPOC model. Clarify Supplier, Input, Process, Output, Customer for each phase.",
+    fiveW: lang === "zh"
+      ? "使用 5W1H 分析法來拆解。透過 Who, What, When, Where, Why, How 進行全方位掃描。"
+      : "Use 5W1H analysis. Cover Who, What, When, Where, Why, How comprehensively.",
+  };
+  return instructions[strategy];
+}
+
+function buildPrompt(goal: string, context: string, lang: Lang, strategy: Strategy): string {
   const langInstruction = lang === "zh"
     ? "請用繁體中文回覆。"
     : "Please respond in English.";
 
-  return `You are a professional project planner and workflow decomposition expert.
+  const methodInstruction = getMethodInstruction(strategy, lang);
+
+  return `You are a professional Workflow Architect and project planner.
 
 ${langInstruction}
+
+Decomposition Method: ${methodInstruction}
 
 The user has a goal: "${goal}"
 ${context ? `Additional context: "${context}"` : ""}
@@ -33,6 +58,7 @@ Break this goal down into a structured workflow. Return ONLY valid JSON (no mark
 
 {
   "goal": "the goal restated clearly",
+  "method": "${strategy === "auto" ? "the method you chose (wbs/userStory/sipoc/fiveW)" : strategy}",
   "phases": [
     {
       "name": "${lang === "zh" ? "Phase 1: 階段名稱" : "Phase 1: Phase Name"}",
@@ -78,10 +104,11 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { goal, context = "", lang = "zh" } = body as {
+    const { goal, context = "", lang = "zh", strategy = "auto" } = body as {
       goal: string;
       context?: string;
       lang?: Lang;
+      strategy?: Strategy;
     };
 
     if (!goal || goal.trim().length < 2) {
@@ -91,7 +118,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const prompt = buildPrompt(goal.trim(), context.trim(), lang as Lang);
+    const validStrategies: Strategy[] = ["auto", "wbs", "userStory", "sipoc", "fiveW"];
+    const safeStrategy = validStrategies.includes(strategy as Strategy) ? strategy as Strategy : "auto";
+
+    const prompt = buildPrompt(goal.trim(), context.trim(), lang as Lang, safeStrategy);
     const raw = await callGemini(prompt);
     const result = JSON.parse(raw);
 
