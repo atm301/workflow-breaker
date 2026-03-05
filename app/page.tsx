@@ -8,7 +8,7 @@ import {
   Settings, Loader2, CheckCircle2, ChevronRight, ChevronDown, Copy, Check, Trash2,
   AlertCircle, BookOpen, LayoutDashboard, Lightbulb, MousePointerClick,
   BrainCircuit, Sun, Moon, Share2, List, GitBranch, RefreshCw, ExternalLink,
-  TrendingUp, GraduationCap,
+  TrendingUp, GraduationCap, Trophy, Flame,
 } from "lucide-react";
 
 type ViewMode = "list" | "flow";
@@ -30,6 +30,25 @@ const stratDescKey: Record<Strategy, string> = { auto: "descAuto", wbs: "descWBS
 // Loading text rotation
 const LOADING_TEXTS_ZH = ["正在分析目標...", "選擇最佳策略...", "拆解工作階段...", "生成執行步驟...", "計算時間估算...", "識別關鍵路徑..."];
 const LOADING_TEXTS_EN = ["Analyzing your goal...", "Selecting best strategy...", "Breaking into phases...", "Generating steps...", "Estimating timelines...", "Identifying critical path..."];
+
+// Weekly challenges — rotates by week number
+const WEEKLY_CHALLENGES = [
+  { zh: "從零開始建立個人品牌", en: "Build a personal brand from scratch", icon: "🏆", strategy: "userStory" as Strategy },
+  { zh: "規劃一場 500 人的線下活動", en: "Plan a 500-person offline event", icon: "🎪", strategy: "wbs" as Strategy },
+  { zh: "打造月營收 10 萬的副業", en: "Create a side business earning $3K/month", icon: "💰", strategy: "sipoc" as Strategy },
+  { zh: "從零轉職成為 AI 工程師", en: "Career switch to AI engineer from scratch", icon: "🤖", strategy: "fiveW" as Strategy },
+  { zh: "建立團隊的遠端協作流程", en: "Build a remote collaboration workflow for your team", icon: "🌐", strategy: "sipoc" as Strategy },
+  { zh: "用 30 天寫完一本電子書", en: "Write an ebook in 30 days", icon: "📖", strategy: "wbs" as Strategy },
+  { zh: "設計並上線一個 AI 產品", en: "Design and launch an AI product", icon: "🚀", strategy: "userStory" as Strategy },
+  { zh: "建立每日內容產出系統", en: "Build a daily content production system", icon: "📝", strategy: "sipoc" as Strategy },
+];
+
+function getWeeklyChallenge() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), 0, 1);
+  const weekNum = Math.floor(((now.getTime() - start.getTime()) / 86400000 + start.getDay() + 1) / 7);
+  return WEEKLY_CHALLENGES[weekNum % WEEKLY_CHALLENGES.length];
+}
 
 function useLoadingText(loading: boolean, lang: Lang) {
   const [idx, setIdx] = useState(0);
@@ -57,6 +76,7 @@ export default function Home() {
   const [context, setContext] = useState("");
   const [strategy, setStrategy] = useState<Strategy>("auto");
   const [loading, setLoading] = useState(false);
+  const [streamText, setStreamText] = useState("");
   const [result, setResult] = useState<WorkflowResult | null>(null);
   const [error, setError] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("list");
@@ -96,6 +116,7 @@ export default function Home() {
     setLoading(true);
     setError("");
     setResult(null);
+    setStreamText("");
     setCheckedSteps(new Set());
     setDrilldowns({});
     setCompareResult(null);
@@ -103,23 +124,62 @@ export default function Home() {
     localStorage.removeItem("wf_checked");
 
     try {
-      const res = await fetch("/api/generate", {
+      const res = await fetch("/api/generate-stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ goal: goal.trim(), context: context.trim(), lang, strategy: overrideStrategy || strategy }),
       });
-      const data = await res.json();
 
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
         if (data.error === "quota_exhausted") setError(d.apiExhausted);
         else if (data.error === "rate_limit") setError(lang === "zh" ? "請求太頻繁，請稍後再試" : "Too many requests.");
         else setError(data.message || d.apiError);
         return;
       }
 
-      setResult(data.data);
-      incrementUsage();
-      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      // Stream reading
+      const reader = res.body?.getReader();
+      if (!reader) { setError(d.apiError); return; }
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (line.startsWith("data: [DONE]")) continue;
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const parsed = JSON.parse(line.slice(6));
+            if (parsed.error) {
+              if (parsed.error === "QUOTA_EXHAUSTED") setError(d.apiExhausted);
+              else setError(parsed.error);
+              return;
+            }
+            if (parsed.text) {
+              accumulated += parsed.text;
+              setStreamText(accumulated);
+            }
+          } catch { /* skip */ }
+        }
+      }
+
+      // Parse the accumulated JSON
+      const jsonMatch = accumulated.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        setResult(parsed);
+        setStreamText("");
+        incrementUsage();
+        setTimeout(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+      } else {
+        setError(d.apiError);
+      }
 
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -414,21 +474,63 @@ export default function Home() {
               </div>
             </section>
 
-            {/* Examples */}
+            {/* Examples + Weekly Challenge */}
             {!result && !loading && (
-              <section className="mb-8">
-                <p className="text-sm text-text-muted mb-3 font-bold flex items-center gap-1.5"><Lightbulb className="w-4 h-4 text-yellow-500" />{d.tryExamples}</p>
-                <div className="flex flex-wrap gap-2">
-                  {d.examples.map(ex => (
-                    <button key={ex.title} onClick={() => handleExample(ex.goal)} className="px-3 py-2 rounded-full bg-white dark:bg-gray-800 border border-border-light dark:border-gray-700 hover:border-brand-primary hover:text-brand-primary transition-colors text-sm font-medium">{ex.icon} {ex.title}</button>
-                  ))}
-                </div>
-              </section>
+              <>
+                <section className="mb-6">
+                  <p className="text-sm text-text-muted mb-3 font-bold flex items-center gap-1.5"><Lightbulb className="w-4 h-4 text-yellow-500" />{d.tryExamples}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {d.examples.map(ex => (
+                      <button key={ex.title} onClick={() => handleExample(ex.goal)} className="px-3 py-2 rounded-full bg-white dark:bg-gray-800 border border-border-light dark:border-gray-700 hover:border-brand-primary hover:text-brand-primary transition-colors text-sm font-medium">{ex.icon} {ex.title}</button>
+                    ))}
+                  </div>
+                </section>
+
+                {/* Weekly Challenge */}
+                {(() => {
+                  const challenge = getWeeklyChallenge();
+                  const challengeGoal = lang === "zh" ? challenge.zh : challenge.en;
+                  return (
+                    <section className="mb-8">
+                      <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-2 border-amber-200 dark:border-amber-700 rounded-2xl p-5 relative overflow-hidden">
+                        <div className="absolute -top-2 -right-2 w-24 h-24 bg-amber-200/30 dark:bg-amber-700/20 rounded-full blur-2xl" />
+                        <div className="relative">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2 rounded-xl shadow-md">
+                              <Trophy className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <h3 className="font-black text-sm text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                                <Flame className="w-4 h-4 text-orange-500" />{d.challengeTitle}
+                              </h3>
+                              <p className="text-[10px] text-amber-700 dark:text-amber-400 font-bold">{d.challengeDesc}</p>
+                            </div>
+                          </div>
+                          <div className="bg-white/60 dark:bg-gray-800/60 rounded-xl p-4 mb-3 backdrop-blur-sm">
+                            <p className="text-lg font-black text-text-main dark:text-gray-100">{challenge.icon} {challengeGoal}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded-full font-bold">
+                                {dk(stratTitleKey[challenge.strategy])}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => { setGoal(challengeGoal); setStrategy(challenge.strategy); }}
+                            className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl transition-all shadow-md text-sm flex items-center gap-2"
+                          >
+                            <Trophy className="w-4 h-4" />{d.challengeCta}
+                          </button>
+                        </div>
+                      </div>
+                    </section>
+                  );
+                })()}
+              </>
             )}
 
             {/* Loading */}
             {loading && (
-              <div className="min-h-[400px] bg-white dark:bg-gray-800 border border-border-light dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-12 space-y-6">
+              <div className="min-h-[400px] bg-white dark:bg-gray-800 border border-border-light dark:border-gray-700 rounded-2xl flex flex-col items-center justify-center p-8 md:p-12 space-y-6">
                 <div className="relative">
                   <div className="w-20 h-20 border-4 border-gray-100 border-t-brand-primary rounded-full animate-spin" />
                   <BrainCircuit className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-brand-primary w-8 h-8 animate-pulse" />
@@ -439,6 +541,17 @@ export default function Home() {
                     <div key={i} className={`w-2 h-2 rounded-full transition-colors duration-300 ${i <= LOADING_TEXTS_ZH.indexOf(lang === "zh" ? loadingText : LOADING_TEXTS_EN[LOADING_TEXTS_ZH.indexOf(loadingText)] || loadingText) ? "bg-brand-primary" : "bg-gray-200 dark:bg-gray-600"}`} />
                   ))}
                 </div>
+                {/* Streaming text preview */}
+                {streamText && (
+                  <div className="w-full max-w-lg mt-4">
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 max-h-48 overflow-y-auto">
+                      <pre className="text-xs text-text-muted font-mono whitespace-pre-wrap break-all leading-relaxed">{streamText.slice(-500)}</pre>
+                    </div>
+                    <p className="text-[10px] text-text-muted text-center mt-2 font-bold">
+                      {lang === "zh" ? "AI 正在即時生成中..." : "AI is generating in real-time..."}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

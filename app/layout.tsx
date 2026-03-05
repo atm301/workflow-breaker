@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Script from "next/script";
 import { CookieConsent } from "./CookieConsent";
+import { ClientWrapper } from "./ClientWrapper";
 
 const GA4_ID = process.env.NEXT_PUBLIC_GA4_ID || "G-RDJD1YVHR7";
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "4979950938896019";
@@ -51,6 +52,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           fbq('init', '${META_PIXEL_ID}');
           fbq('track', 'PageView');
         `}</Script>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="theme-color" content="#6366F1" />
+        <Script id="sw-register" strategy="afterInteractive">{`
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+          }
+        `}</Script>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -68,7 +76,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-surface dark:bg-surface-dark antialiased">
-        {children}
+        <ClientWrapper>{children}</ClientWrapper>
         <CookieConsent />
       </body>
     </html>

@@ -1,0 +1,12 @@
+{
+  "name": "WorkFlow Breaker",
+  "short_name": "WF Breaker",
+  "description": "AI-powered workflow decomposition tool",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FAFAFA",
+  "theme_color": "#6366F1",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

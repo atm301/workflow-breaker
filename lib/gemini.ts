@@ -1,5 +1,71 @@
 const GEMINI_MODEL = "gemini-2.5-flash";
 
+/**
+ * Streaming call: yields raw text chunks from Gemini.
+ * The caller is responsible for accumulating and JSON-parsing.
+ */
+export async function* streamGemini(prompt: string): AsyncGenerator<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not set");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90_000);
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.5,
+          maxOutputTokens: 8192,
+          thinkingConfig: { thinkingBudget: 2048 },
+        },
+      }),
+    }
+  );
+  clearTimeout(timeout);
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    if (errText.includes("RESOURCE_EXHAUSTED") || errText.includes("quota")) {
+      throw new Error("QUOTA_EXHAUSTED");
+    }
+    throw new Error(`Gemini API error (${res.status})`);
+  }
+
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error("No response body");
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    // SSE format: lines starting with "data: " followed by JSON
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      const json = line.slice(6).trim();
+      if (!json || json === "[DONE]") continue;
+      try {
+        const chunk = JSON.parse(json);
+        const parts = chunk.candidates?.[0]?.content?.parts || [];
+        for (const part of parts) {
+          if (part.text && !part.text.startsWith("<")) {
+            yield part.text;
+          }
+        }
+      } catch { /* skip malformed chunks */ }
+    }
+  }
+}
+
 export async function callGemini(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not set");

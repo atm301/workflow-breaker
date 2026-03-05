@@ -81,6 +81,12 @@ const dict = {
       { title: "行銷自動化", goal: "我想建立每月行銷報告的自動化流程", icon: "📊" },
       { title: "辦線上活動", goal: "我想舉辦一場 200 人的線上研討會", icon: "🎤" },
     ],
+    // Weekly challenge
+    challengeTitle: "本週挑戰",
+    challengeDesc: "每週精選一個目標主題，試試你的拆解！",
+    challengeCta: "接受挑戰",
+    challengeShare: "分享我的拆解",
+    challengeParticipants: "人已參加",
   },
   en: {
     siteTitle: "WorkFlow Breaker",
@@ -148,6 +154,11 @@ const dict = {
     howToAiTitle: "AI Prompting Tips",
     howToAiContent: "For User Story, describe 'who the user is'. For SIPOC, list 'available inputs' in the context.",
     backToTool: "Back to Decomposer",
+    challengeTitle: "Weekly Challenge",
+    challengeDesc: "A featured goal topic each week. Try your decomposition!",
+    challengeCta: "Accept Challenge",
+    challengeShare: "Share my result",
+    challengeParticipants: "joined",
     examples: [
       { title: "Launch SaaS", goal: "Launch a SaaS product in 3 months", icon: "🚀" },
       { title: "Grow IG to 10K", goal: "Grow an Instagram account to 10K followers", icon: "📱" },
