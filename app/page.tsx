@@ -387,7 +387,7 @@ export default function Home() {
     return (
       <div key={si} className={`bg-white dark:bg-gray-800 rounded-xl border border-border-light dark:border-gray-700 p-4 transition-all hover:shadow-md ${checked ? "opacity-50" : ""}`}>
         <div className="flex items-start gap-3">
-          <button onClick={() => toggleStep(stepId)} className={`mt-0.5 w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${checked ? "bg-brand-primary border-brand-primary text-white" : "border-gray-300 dark:border-gray-600 hover:border-brand-primary"}`}>
+          <button onClick={() => toggleStep(stepId)} aria-label={`${checked ? (lang === "zh" ? "取消完成" : "Unmark") : (lang === "zh" ? "標記完成" : "Mark done")}: ${step.title}`} aria-pressed={checked} role="checkbox" aria-checked={checked} className={`mt-0.5 w-5 h-5 rounded border-2 flex-shrink-0 flex items-center justify-center transition-colors ${checked ? "bg-brand-primary border-brand-primary text-white" : "border-gray-300 dark:border-gray-600 hover:border-brand-primary"}`}>
             {checked && <Check className="w-3 h-3" />}
           </button>
           <div className="flex-1 min-w-0">
@@ -471,13 +471,13 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2 w-full md:w-auto">
-            <a href="/methods" className="px-4 py-2 rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold text-text-muted flex items-center gap-1.5 transition-colors">
+            <a href="/methods" aria-label={d.navTutorial} className="px-4 py-2 rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold text-text-muted flex items-center gap-1.5 transition-colors">
               <BookOpen className="w-4 h-4 text-brand-primary" />{d.navTutorial}
             </a>
-            <button onClick={() => { setLang(lang === "zh" ? "en" : "zh"); setResult(null); }} className="px-3 py-2 rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold text-text-muted flex items-center gap-1.5 transition-colors">
+            <button onClick={() => { setLang(lang === "zh" ? "en" : "zh"); setResult(null); }} aria-label={lang === "zh" ? "Switch to English" : "切換為中文"} className="px-3 py-2 rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm font-bold text-text-muted flex items-center gap-1.5 transition-colors">
               <Globe className="w-4 h-4 text-brand-primary" />{lang === "zh" ? "EN" : "中文"}
             </button>
-            <button onClick={toggleDark} className="px-3 py-2 rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm transition-colors" title={dark ? d.lightMode : d.darkMode}>
+            <button onClick={toggleDark} aria-label={dark ? d.lightMode : d.darkMode} className="px-3 py-2 rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm transition-colors" title={dark ? d.lightMode : d.darkMode}>
               {dark ? <Sun className="w-4 h-4 text-yellow-500" /> : <Moon className="w-4 h-4 text-text-muted" />}
             </button>
           </div>
@@ -507,7 +507,7 @@ export default function Home() {
                     {STRATEGIES.map(s => {
                       const Icon = s.icon; const active = strategy === s.id;
                       return (
-                        <button key={s.id} onClick={() => setStrategy(s.id)} className={`p-3 rounded-xl border-2 text-left transition-all ${active ? s.activeColor : "border-gray-100 dark:border-gray-600 hover:border-gray-300 bg-white dark:bg-gray-700"} ${s.id === "auto" ? "col-span-2 sm:col-span-1" : ""}`}>
+                        <button key={s.id} onClick={() => setStrategy(s.id)} aria-label={`${lang === "zh" ? "選擇策略" : "Select strategy"}: ${dk(stratTitleKey[s.id])}`} aria-pressed={active} className={`p-3 rounded-xl border-2 text-left transition-all ${active ? s.activeColor : "border-gray-100 dark:border-gray-600 hover:border-gray-300 bg-white dark:bg-gray-700"} ${s.id === "auto" ? "col-span-2 sm:col-span-1" : ""}`}>
                           <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${active ? s.color + " text-white shadow-md" : "bg-gray-100 dark:bg-gray-600 text-text-muted"}`}><Icon className="w-4 h-4" /></div>
                           <div className={`text-xs font-black mb-0.5 ${active ? "text-text-main dark:text-gray-100" : "text-text-muted"}`}>{dk(stratTitleKey[s.id])}</div>
                           <div className={`text-[10px] font-bold ${active ? "text-brand-primary" : "text-gray-400"}`}>{dk(s.tagKey)}</div>
@@ -522,7 +522,7 @@ export default function Home() {
                   <textarea value={context} onChange={e => setContext(e.target.value)} rows={2} placeholder={d.contextPlaceholder} className="w-full px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700 border-2 border-gray-100 dark:border-gray-600 focus:bg-white dark:focus:bg-gray-600 focus:border-brand-primary outline-none transition-all text-text-main dark:text-gray-100 font-medium resize-none" />
                 </div>
 
-                <button onClick={() => handleGenerate()} disabled={!goal.trim() || loading} className="btn-gradient w-full py-4 rounded-xl font-black text-base flex items-center justify-center gap-2 shadow-lg">
+                <button onClick={() => handleGenerate()} disabled={!goal.trim() || loading} aria-label={loading ? d.generating : d.generateBtn} className="btn-gradient w-full py-4 rounded-xl font-black text-base flex items-center justify-center gap-2 shadow-lg">
                   {loading ? <><Loader2 className="animate-spin w-5 h-5" />{d.generating}</> : <><Sparkles className="w-5 h-5" />{d.generateBtn}</>}
                 </button>
               </div>
@@ -535,7 +535,7 @@ export default function Home() {
                   <p className="text-sm text-text-muted mb-3 font-bold flex items-center gap-1.5"><Lightbulb className="w-4 h-4 text-yellow-500" />{d.tryExamples}</p>
                   <div className="flex flex-wrap gap-2">
                     {d.examples.map(ex => (
-                      <button key={ex.title} onClick={() => handleExample(ex.goal)} className="px-3 py-2 rounded-full bg-white dark:bg-gray-800 border border-border-light dark:border-gray-700 hover:border-brand-primary hover:text-brand-primary transition-colors text-sm font-medium">{ex.icon} {ex.title}</button>
+                      <button key={ex.title} onClick={() => handleExample(ex.goal)} title={ex.goal} aria-label={`${lang === "zh" ? "範例" : "Example"}: ${ex.goal}`} className="example-btn px-3 py-2 rounded-full active:scale-95 transition-all duration-200 text-sm font-medium">{ex.icon} {ex.title}</button>
                     ))}
                   </div>
                 </section>
@@ -570,6 +570,7 @@ export default function Home() {
                           </div>
                           <button
                             onClick={() => { setGoal(challengeGoal); setStrategy(challenge.strategy); }}
+                            aria-label={`${d.challengeCta}: ${challengeGoal}`}
                             className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl transition-all shadow-md text-sm flex items-center gap-2"
                           >
                             <Trophy className="w-4 h-4" />{d.challengeCta}
@@ -672,11 +673,11 @@ export default function Home() {
                   <div className="flex flex-wrap items-center gap-2 ml-auto">
                     {/* View toggle */}
                     <div className="flex rounded-lg overflow-hidden border border-border-light dark:border-gray-600">
-                      <button onClick={() => setViewMode("list")} className={`px-3 py-1.5 text-sm font-bold transition-colors flex items-center gap-1 ${viewMode === "list" ? "bg-brand-primary text-white" : "bg-white dark:bg-gray-800 hover:bg-gray-50 text-text-muted"}`}><List className="w-3.5 h-3.5" />{d.listView}</button>
-                      <button onClick={() => setViewMode("flow")} className={`px-3 py-1.5 text-sm font-bold transition-colors flex items-center gap-1 ${viewMode === "flow" ? "bg-brand-primary text-white" : "bg-white dark:bg-gray-800 hover:bg-gray-50 text-text-muted"}`}><GitBranch className="w-3.5 h-3.5" />{d.flowView}</button>
+                      <button onClick={() => setViewMode("list")} aria-label={d.listView} aria-pressed={viewMode === "list"} className={`px-3 py-1.5 text-sm font-bold transition-colors flex items-center gap-1 ${viewMode === "list" ? "bg-brand-primary text-white" : "bg-white dark:bg-gray-800 hover:bg-gray-50 text-text-muted"}`}><List className="w-3.5 h-3.5" />{d.listView}</button>
+                      <button onClick={() => setViewMode("flow")} aria-label={d.flowView} aria-pressed={viewMode === "flow"} className={`px-3 py-1.5 text-sm font-bold transition-colors flex items-center gap-1 ${viewMode === "flow" ? "bg-brand-primary text-white" : "bg-white dark:bg-gray-800 hover:bg-gray-50 text-text-muted"}`}><GitBranch className="w-3.5 h-3.5" />{d.flowView}</button>
                     </div>
                     {/* Re-generate */}
-                    <button onClick={() => handleGenerate()} className="px-3 py-1.5 text-sm font-bold rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1" title={lang === "zh" ? "重新拆解" : "Re-generate"}>
+                    <button onClick={() => handleGenerate()} aria-label={lang === "zh" ? "重新拆解" : "Re-generate"} className="px-3 py-1.5 text-sm font-bold rounded-lg border border-border-light dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-1" title={lang === "zh" ? "重新拆解" : "Re-generate"}>
                       <RefreshCw className="w-3.5 h-3.5" />
                     </button>
                     {/* Export dropdown */}
@@ -701,7 +702,7 @@ export default function Home() {
                         <button onClick={shareToX} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 font-medium">𝕏 X (Twitter)</button>
                       </div>
                     </div>
-                    <button onClick={() => { setResult(null); setDrilldowns({}); setCompareResult(null); }} className="p-1.5 rounded-lg border border-border-light dark:border-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 text-text-muted hover:text-red-500 transition-all" title={d.clearBtn}><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => { setResult(null); setDrilldowns({}); setCompareResult(null); }} aria-label={d.clearBtn} className="p-1.5 rounded-lg border border-border-light dark:border-gray-600 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 text-text-muted hover:text-red-500 transition-all" title={d.clearBtn}><Trash2 className="w-4 h-4" /></button>
                   </div>
                 </div>
 
@@ -779,9 +780,9 @@ export default function Home() {
                   </div>
                 )}
                 {result.risks?.length > 0 && (
-                  <div className="mt-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
-                    <h3 className="font-bold text-sm text-amber-800 dark:text-amber-300 mb-2">⚠️ {d.risks}</h3>
-                    <ul className="space-y-1">{result.risks.map((risk, i) => <li key={i} className="text-sm text-amber-700 dark:text-amber-300 flex items-start gap-2 font-medium"><span className="mt-1 text-xs">•</span>{risk}</li>)}</ul>
+                  <div className="mt-4 p-4 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-700 rounded-xl">
+                    <h3 className="font-bold text-sm text-red-800 dark:text-red-200 mb-2">⚠️ {d.risks}</h3>
+                    <ul className="space-y-1">{result.risks.map((risk, i) => <li key={i} className="text-sm text-red-700 dark:text-red-200 flex items-start gap-2 font-medium"><span className="mt-1 text-xs">•</span>{risk}</li>)}</ul>
                   </div>
                 )}
 

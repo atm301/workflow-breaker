@@ -14,9 +14,44 @@
 :root {
   --brand-primary: #6366F1;
   --brand-secondary: #8B5CF6;
+  /* Dark mode semantic tokens (light defaults) */
+  --card-bg: #FFFFFF;
+  --card-border: #E5E7EB;
+  --card-bg-hover: #F9FAFB;
+  --input-bg: #F9FAFB;
+  --input-border: #F3F4F6;
+  --text-primary: #1F2937;
+  --text-secondary: #6B7280;
+  --text-on-dark-surface: #E5E7EB;
+}
+
+.dark {
+  --card-bg: #374151;
+  --card-border: #6B7280;
+  --card-bg-hover: #4B5563;
+  --input-bg: #374151;
+  --input-border: #4B5563;
+  --text-primary: #F3F4F6;
+  --text-secondary: #D1D5DB;
+  --text-on-dark-surface: #F3F4F6;
 }
 
 html { scroll-behavior: smooth; }
+
+/* Dark mode transition — smooth color changes on toggle */
+html,
+html body,
+html header,
+html main,
+html footer,
+html section,
+html div,
+html button,
+html a,
+html input,
+html textarea {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -27,6 +62,28 @@ body {
 .dark body {
   background: var(--color-surface-dark);
   color: #E5E7EB;
+}
+
+/* Override Tailwind text-text-muted in dark mode for WCAG AA contrast */
+.dark .text-text-muted {
+  color: #D1D5DB !important;  /* gray-300: 10.2:1 on #1E1E2E */
+}
+
+/* Example buttons — uses semantic dark mode tokens */
+.example-btn {
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--card-border);
+}
+.example-btn:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+  background: var(--card-bg-hover);
+  box-shadow: 0 0 0 1px var(--brand-primary);
+  transform: translateY(-1px);  /* Non-color hover indicator for color-blind users */
+}
+.example-btn:active {
+  transform: scale(0.95);
 }
 
 /* Gradient button */
@@ -88,6 +145,21 @@ body {
 .animate-fade-in-up {
   animation: fadeInUp 0.4s ease-out forwards;
   opacity: 0;
+}
+
+/* Color-blind friendly: links get underline on hover as non-color indicator */
+footer a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Focus ring — visible in both light and dark mode */
+:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+.dark :focus-visible {
+  outline-color: #A78BFA; /* brand-accent — brighter purple for dark bg */
 }
 
 /* Flow chart node */
